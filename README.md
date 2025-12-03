@@ -51,6 +51,8 @@ Converged in 2 iterations. Simplest at 42 lines with perfect correctness.
 - **display.py**: Terminal output and progress bars
 - **cli.py**: Entry point and argument parsing
 
-## Demo
+## Examples
 
-See `agentfleet-demo-ratelimiter/` for a complete example with reference implementations.
+See `examples/` for complete demonstrations:
+
+- **[URL Shortener Rate Limiting](examples/url-shortener-rate-limiting/)** - Add rate limiting to a Flask app, comparing Token Bucket, Sliding Window, and Fixed Window approaches
