@@ -12,8 +12,11 @@ AgentFleet runs multiple AI agents simultaneously, each implementing a different
 # Install
 pip install -e .
 
-# Run tournament
+# Run tournament (standalone implementation)
 agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" "Fixed window"
+
+# Run on existing codebase (agents create git worktrees with separate branches)
+agentfleet "Add rate limiting to app.py" "Token bucket" "Sliding window" --repo path/to/git-repo
 
 # Interactive mode (pause at decisions)
 agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" --interactive
@@ -41,6 +44,26 @@ Decision Trail:
 
 Converged in 2 iterations. Simplest at 42 lines with perfect correctness.
 ```
+
+## Git Worktrees
+
+When using `--repo`, AgentFleet creates git worktrees for each agent instead of copying files. Each agent works in an isolated branch:
+
+```bash
+# After tournament
+cd your-repo
+git worktree list                    # See all agent worktrees
+git branch -a                        # See agent branches (agent/*)
+git diff agent/sliding-window        # Compare with master
+git checkout agent/token-bucket      # Inspect an approach
+git merge agent/sliding-window       # Merge the winner
+```
+
+Worktrees persist after the tournament, allowing you to:
+- Review each implementation independently
+- Compare approaches using git diff
+- Test different implementations
+- Merge the winning approach into your main branch
 
 ## Architecture
 

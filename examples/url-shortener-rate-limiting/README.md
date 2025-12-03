@@ -42,10 +42,25 @@ export ANTHROPIC_API_KEY=your_key_here
 
 ```bash
 agentfleet \
-  "Add rate limiting to flask-url-shortener/app.py: 10 req/min on /shorten, 100 req/min on redirects, per-user. Use the {approach} approach." \
+  "Add rate limiting to app.py: 10 req/min on /shorten, 100 req/min on redirects, per-user. Use the {approach} approach." \
   "Token bucket" "Sliding window" "Fixed window" \
+  --repo flask-url-shortener \
   --work-dir ./work
 ```
+
+The `--repo` flag points AgentFleet to the flask-url-shortener git repository. Each agent gets an independent git worktree with its own branch:
+- `agent/token-bucket`
+- `agent/sliding-window`
+- `agent/fixed-window`
+
+After the tournament, you can inspect each agent's implementation:
+```bash
+cd flask-url-shortener
+git worktree list          # See all worktrees
+git diff agent/sliding-window agent/token-bucket  # Compare approaches
+```
+
+The worktrees remain after the tournament so you can review, test, or merge the winning approach.
 
 ### What Happens
 

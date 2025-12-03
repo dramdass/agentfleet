@@ -22,6 +22,7 @@ async def run_agent_loop(
     approach: str,
     work_dir: Path,
     max_iterations: int = 10,
+    source_repo: Path | None = None,
     on_decision_callback: Callable[[Decision], None] | None = None,
 ) -> AgentResult:
     """Run the agentic implementation loop for a single approach.
@@ -38,13 +39,19 @@ async def run_agent_loop(
         approach: Name of approach to implement
         work_dir: Directory to work in (isolated per agent)
         max_iterations: Maximum number of fix iterations
+        source_repo: Optional path to source repository to copy into work_dir
         on_decision_callback: Optional callback for decision events
 
     Returns:
         AgentResult with success status, iterations, decisions, metrics
     """
     # Setup
-    work_dir.mkdir(parents=True, exist_ok=True)
+    if source_repo:
+        # Create git worktree (will create work_dir)
+        _copy_source_repo(source_repo, work_dir, approach)
+    else:
+        # No source repo, just create work directory
+        work_dir.mkdir(parents=True, exist_ok=True)
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not set")
@@ -342,3 +349,62 @@ Failed Tests:
 
 Please analyze these failures and fix the issues in your solution.
 """
+
+
+def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> None:
+    """Create a git worktree for the agent to work in.
+
+    Args:
+        source_repo: Path to source git repository
+        work_dir: Destination work directory (will be created as worktree)
+        approach: Approach name (used for branch naming)
+
+    Raises:
+        FileNotFoundError: If source_repo doesn't exist
+        ValueError: If source_repo is not a git repository
+    """
+    if not source_repo.exists():
+        raise FileNotFoundError(f"Source repository not found: {source_repo}")
+
+    # Verify it's a git repository
+    git_dir = source_repo / ".git"
+    if not git_dir.exists():
+        raise ValueError(f"Source repository is not a git repository: {source_repo}")
+
+    # Create sanitized branch name from approach
+    branch_name = f"agent/{approach.lower().replace(' ', '-')}"
+
+    # Create worktree with new branch
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "add", "-b", branch_name, str(work_dir)],
+            cwd=source_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        # If branch already exists, try to remove it first and retry
+        if "already exists" in e.stderr:
+            # Remove existing branch
+            subprocess.run(
+                ["git", "branch", "-D", branch_name],
+                cwd=source_repo,
+                capture_output=True,
+            )
+            # Remove existing worktree if any
+            subprocess.run(
+                ["git", "worktree", "remove", str(work_dir), "--force"],
+                cwd=source_repo,
+                capture_output=True,
+            )
+            # Retry
+            subprocess.run(
+                ["git", "worktree", "add", "-b", branch_name, str(work_dir)],
+                cwd=source_repo,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        else:
+            raise ValueError(f"Failed to create git worktree: {e.stderr}") from e

@@ -96,6 +96,12 @@ Examples:
         help="Save winner's code to this file (default: winner.py)",
     )
 
+    parser.add_argument(
+        "--repo",
+        type=Path,
+        help="Path to git repository to modify (agents create worktrees with branches like agent/token-bucket)",
+    )
+
     return parser.parse_args()
 
 
@@ -150,6 +156,7 @@ async def main_async() -> int:
                 max_iterations=args.max_iter,
                 mode=mode,
                 work_base_dir=args.work_dir,
+                source_repo=args.repo,
             )
             progress.stop()
 

@@ -15,6 +15,7 @@ async def run_tournament(
     max_iterations: int = 10,
     mode: str = "speculative",
     work_base_dir: Path | None = None,
+    source_repo: Path | None = None,
     on_progress_callback: Callable[[str, int, bool], None] | None = None,
 ) -> TournamentResult:
     """Run a tournament with multiple agents in parallel.
@@ -29,6 +30,7 @@ async def run_tournament(
         max_iterations: Max iterations per agent
         mode: "speculative" (auto-decide) or "interactive" (pause for decisions)
         work_base_dir: Base directory for agent workspaces
+        source_repo: Optional path to source repository to copy to each agent's workspace
         on_progress_callback: Callback(approach, iteration, success) for live updates
 
     Returns:
@@ -56,6 +58,7 @@ async def run_tournament(
             approach=approach,
             work_dir=work_dir,
             max_iterations=max_iterations,
+            source_repo=source_repo,
             on_decision_callback=decision_callback,
         )
         for approach, work_dir in zip(approaches, work_dirs)
