@@ -90,3 +90,32 @@ def test_build_pr_body_includes_results():
     assert "agent/sliding-window" in body
 
 
+def test_snapshot_worktree_no_changes(monkeypatch, tmp_path):
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, check=False):
+        if cmd[:2] == ["git", "status"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        raise AssertionError("Only git status should run when no changes")
+
+    monkeypatch.setattr(git_utils.subprocess, "run", fake_run)
+    assert git_utils.snapshot_worktree(tmp_path, "msg") is False
+
+
+def test_snapshot_worktree_commits(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, check=False):
+        if cmd[:2] == ["git", "status"]:
+            return SimpleNamespace(returncode=0, stdout="?? file\n", stderr="")
+        if cmd[:2] == ["git", "add"]:
+            calls.append("add")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[:2] == ["git", "commit"]:
+            calls.append("commit")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        raise AssertionError(f"Unexpected git command: {cmd}")
+
+    monkeypatch.setattr(git_utils.subprocess, "run", fake_run)
+    assert git_utils.snapshot_worktree(tmp_path, "msg") is True
+    assert calls == ["add", "commit"]
+
+

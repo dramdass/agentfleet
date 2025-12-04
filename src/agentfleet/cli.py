@@ -13,6 +13,7 @@ from agentfleet.git_utils import (
     create_pull_request,
     format_agent_branch,
     write_pr_body_file,
+    snapshot_worktree,
 )
 from agentfleet.display import (
     print_plan,
@@ -292,6 +293,22 @@ def _maybe_create_pull_request(
     branch_name = winner.branch_name or format_agent_branch(winner.approach)
     if not branch_name:
         return None
+
+    worktree_path = Path(winner.work_dir).expanduser()
+    commit_note = "pass" if winner.success else "draft"
+    commit_message = f"AgentFleet: {winner.approach} ({commit_note})"
+
+    try:
+        changed = snapshot_worktree(worktree_path, commit_message)
+    except ValueError as exc:
+        return "error", f"Failed to prepare branch '{branch_name}': {exc}"
+
+    if not changed:
+        return (
+            "manual",
+            "Winning branch has no changes to commit. "
+            "Inspect the worktree and commit modifications before opening a PR.",
+        )
 
     pr_body = build_pr_body(tournament_result)
     body_file = write_pr_body_file(work_dir, branch_name, pr_body)

@@ -222,6 +222,53 @@ def write_pr_body_file(work_base_dir: Path, branch_name: str, body: str) -> Path
     return body_path
 
 
+def snapshot_worktree(worktree_path: Path, commit_message: str) -> bool:
+    """Stage and commit any pending changes in a worktree.
+
+    Returns:
+        True if a commit was created, False if there were no changes.
+    """
+    worktree = worktree_path.expanduser().resolve()
+
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError:
+        raise ValueError("git executable not found. Cannot inspect worktree.") from None
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.strip() if exc.stderr else exc.stdout.strip()
+        raise ValueError(f"git status failed: {stderr}") from exc
+
+    if not status.stdout.strip():
+        return False
+
+    try:
+        subprocess.run(
+            ["git", "add", "-A"],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.strip() if exc.stderr else exc.stdout.strip()
+        raise ValueError(f"git commit failed: {stderr}") from exc
+
+    return True
+
+
 def push_branch(repo_path: Path, branch_name: str) -> tuple[bool, str | None]:
     """Push the branch to origin."""
     try:
