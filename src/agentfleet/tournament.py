@@ -6,6 +6,7 @@ from typing import Callable
 
 from agentfleet.agent import run_agent_loop
 from agentfleet.models import AgentResult, Decision, Plan, TournamentResult
+from agentfleet.git_utils import format_agent_branch
 
 
 async def run_tournament(
@@ -91,6 +92,7 @@ async def run_tournament(
                     metrics={},
                     final_code="",
                     work_dir=str(work_dirs[i]),
+                    branch_name=format_agent_branch(approaches[i]),
                     error=str(result),
                 )
             )

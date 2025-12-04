@@ -17,10 +17,14 @@ agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" "Fixed win
   --repo /Users/you/path/to/repo
 
 # Run directly from GitHub (AgentFleet clones into ./work/repos/<slug>)
-agentfleet "Add rate limiting" "Token bucket" "Sliding window" \
+agentfleet "Add rate limiting to Flask app.py using the {approach} approach" \
+  "Token bucket" "Sliding window" \
   --repo https://github.com/dramdass/flask-url-shortener.git
 
 > `--repo` is required and must be either an absolute local path or a full GitHub URL.
+
+# Skip the automatic pull request (optional)
+agentfleet ... --skip-pr
 
 # Interactive mode (pause at decisions)
 agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" --interactive
@@ -51,7 +55,7 @@ Converged in 2 iterations. Simplest at 42 lines with perfect correctness.
 
 ## Git Worktrees
 
-AgentFleet always targets a git repository. If you pass an absolute filesystem path we use it directly; if you pass a GitHub URL we clone it into `--work-dir/repos/<repo-slug>` and reuse that checkout on future runs. Every agent operates in its own worktree/branch:
+AgentFleet always targets a git repository. If you pass an absolute filesystem path we use it directly; if you pass a GitHub URL we clone it into `--work-dir/repos/<repo-slug>` and reuse that checkout on future runs. Every agent operates in its own worktree/branch (e.g., `agent/sliding-window`), so parallel approaches never trample each other:
 
 ```bash
 # After tournament
@@ -73,6 +77,14 @@ Typical review flow after a tournament:
 
 Worktrees persist after the tournament so you can diff, test, and merge whenever you're ready. Delete them with `git worktree remove <path>` once you're done.
 
+## Automatic Pull Requests
+
+By default AgentFleet will push the winning branch to `origin` and run `gh pr create --base <base-branch> --head agent/<approach>` with a rich summary (task, metrics, decision trail, and alternate approaches). We store the generated PR body under `--work-dir/agentfleet_pr/agent-<approach>.md` so you can edit or reuse it.
+
+- Set `--base-branch my-default` to target something other than `main`.
+- Pass `--skip-pr` to opt out (you can still create a PR manually with the generated body file).
+- If the GitHub CLI is missing or fails, we fall back to printing the exact commands you can run yourself.
+
 ## Architecture
 
 - **planner.py**: Supervisor agent generates evaluation criteria
@@ -82,8 +94,6 @@ Worktrees persist after the tournament so you can diff, test, and merge whenever
 - **display.py**: Terminal output and progress bars
 - **cli.py**: Entry point and argument parsing
 
-## Examples
+## Reference Demo Repo
 
-See `examples/` for complete demonstrations:
-
-- **[URL Shortener Rate Limiting](examples/url-shortener-rate-limiting/)** - Add rate limiting to a Flask app, comparing Token Bucket, Sliding Window, and Fixed Window approaches
+For a realistic end-to-end task, point `--repo` at [dramdass/flask-url-shortener](https://github.com/dramdass/flask-url-shortener). The tournament will create per-approach branches (e.g., `agent/token-bucket`) directly inside that repository so you can review, test, and merge the winner via the automatically opened pull request.

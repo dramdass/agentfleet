@@ -7,7 +7,13 @@ from pathlib import Path
 
 from agentfleet.planner import generate_plan
 from agentfleet.tournament import run_tournament
-from agentfleet.git_utils import resolve_repo
+from agentfleet.git_utils import (
+    resolve_repo,
+    build_pr_body,
+    create_pull_request,
+    format_agent_branch,
+    write_pr_body_file,
+)
 from agentfleet.display import (
     print_plan,
     print_results,
@@ -18,6 +24,7 @@ from agentfleet.display import (
     show_menu,
     print_error,
     print_success,
+    print_warning,
     show_spinner,
     console,
 )
@@ -104,6 +111,19 @@ Examples:
         help="Absolute path or GitHub URL for the target repository (agents create worktrees with branches like agent/token-bucket)",
     )
 
+    parser.add_argument(
+        "--base-branch",
+        type=str,
+        default="main",
+        help="Base branch for pull requests (default: main)",
+    )
+
+    parser.add_argument(
+        "--skip-pr",
+        action="store_true",
+        help="Skip automatic pull request creation for the winning branch",
+    )
+
     return parser.parse_args()
 
 
@@ -143,7 +163,7 @@ async def main_async() -> int:
     try:
         # Phase 1: Generate evaluation plan
         with show_spinner("Generating evaluation plan...") as progress:
-            task_id = progress.add_task("Planning...", total=None)
+            progress.add_task("Planning...", total=None)
             plan = await generate_plan(args.task, args.approaches)
             progress.stop()
 
@@ -161,7 +181,7 @@ async def main_async() -> int:
         console.print(f"\n[bold cyan]Starting tournament ({mode} mode)...[/bold cyan]\n")
 
         with show_spinner("Running agents...") as progress:
-            task_id = progress.add_task("Tournament in progress...", total=None)
+            progress.add_task("Tournament in progress...", total=None)
             tournament_result = await run_tournament(
                 task=args.task,
                 approaches=args.approaches,
@@ -212,6 +232,24 @@ async def main_async() -> int:
         elif args.output:
             save_winner(tournament_result, args.output)
 
+        pr_outcome = None
+        if not args.skip_pr:
+            pr_outcome = _maybe_create_pull_request(
+                tournament_result=tournament_result,
+                repo_path=repo_path,
+                base_branch=args.base_branch,
+                work_dir=args.work_dir,
+            )
+
+        if pr_outcome:
+            status, info = pr_outcome
+            if status == "created":
+                print_success(f"Pull request created: {info}")
+            elif status == "manual":
+                print_warning(info)
+            else:
+                print_error(info)
+
         console.print("\n[bold green]Done![/bold green]\n")
         return 0
 
@@ -238,6 +276,42 @@ def main() -> int:
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
         return 130
+
+
+def _maybe_create_pull_request(
+    tournament_result,
+    repo_path: Path,
+    base_branch: str,
+    work_dir: Path,
+) -> tuple[str, str | None] | None:
+    """Create a PR for the winning branch, if possible."""
+    winner = tournament_result.winner
+    if not winner:
+        return None
+
+    branch_name = winner.branch_name or format_agent_branch(winner.approach)
+    if not branch_name:
+        return None
+
+    pr_body = build_pr_body(tournament_result)
+    body_file = write_pr_body_file(work_dir, branch_name, pr_body)
+    title = _build_pr_title(winner.approach, tournament_result.plan.resolved_task)
+
+    return create_pull_request(
+        repo_path=repo_path,
+        branch_name=branch_name,
+        base_branch=base_branch,
+        title=title,
+        body_file=body_file,
+    )
+
+
+def _build_pr_title(approach: str, resolved_task: str) -> str:
+    """Generate a concise PR title."""
+    task = " ".join(resolved_task.split())
+    if len(task) > 80:
+        task = task[:77] + "..."
+    return f"[AgentFleet] {approach} – {task}"
 
 
 if __name__ == "__main__":

@@ -350,68 +350,16 @@ def print_decisions(tournament: TournamentResult, approach: str):
 
 **Exit Code**: 0 if all tests pass, 1 if any fail
 
-### Demo Repository Structure
+### Reference Demo Repository
 
-```
-agentfleet-demo-ratelimiter/
-├── README.md                      # Explains the challenge and expected results
-├── reference/
-│   ├── token_bucket.py            # Clean reference implementation
-│   ├── sliding_window.py          # Clean reference implementation
-│   └── fixed_window.py            # Has intentional boundary bug
-└── eval/
-    └── eval_example.py            # Example of supervisor output
-```
+Instead of bundling a demo app inside this repo, AgentFleet now points to live targets. The canonical example uses [dramdass/flask-url-shortener](https://github.com/dramdass/flask-url-shortener):
 
-**Demo README Content**:
-```markdown
-# AgentFleet Demo: Rate Limiter Comparison
+1. `git clone https://github.com/dramdass/flask-url-shortener.git`
+2. Run AgentFleet with `--repo /absolute/path/to/flask-url-shortener`
+3. Each approach gets its own worktree/branch (e.g., `agent/token-bucket`)
+4. After the tournament AgentFleet pushes the winning branch and opens a PR against `main`
 
-This demo compares three approaches to implementing a rate limiter.
-
-## The Challenge
-
-Implement a rate limiter that allows at most N requests per time window.
-
-Requirements:
-- Must track requests per user
-- Must handle boundary cases (exactly N requests, window expiry)
-- Should be thread-safe for production use
-- Should be simple and maintainable
-
-## Approaches
-
-1. **Token Bucket**: Accumulates tokens over time, spends on requests
-2. **Sliding Window**: Tracks exact timestamps, rolls window continuously
-3. **Fixed Window**: Resets counter at fixed intervals (has boundary bug!)
-
-## Expected Results
-
-When you run:
-```bash
-agentfleet "Implement rate limiter allowing 5 requests per minute per user" \
-           "Token bucket" "Sliding window" "Fixed window"
-```
-
-Expected winner: **Sliding window** (95/100)
-- Passes all tests including boundary cases
-- Simplest implementation (~42 lines)
-- Most accurate rate limiting
-
-Fixed window should fail the boundary test due to allowing 2x requests at window edge.
-
-## Reference Implementations
-
-The `reference/` directory contains human-written implementations for comparison.
-These are NOT used by agents—they implement from scratch based on approach name.
-
-## Running Manually
-
-You can test the eval script directly:
-```bash
-python eval/eval_example.py reference/sliding_window.py
-```
-```
+All reference implementations, eval scripts, and documentation remain in that upstream repository so they stay realistic and versioned alongside the production code.
 
 ### Testing Strategy
 

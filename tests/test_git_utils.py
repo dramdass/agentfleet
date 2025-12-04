@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from agentfleet import git_utils
+from agentfleet.models import Plan, AgentResult, Iteration, TournamentResult
 
 
 def test_resolve_repo_accepts_existing_path(monkeypatch, tmp_path):
@@ -48,4 +49,44 @@ def test_resolve_repo_clones_remote_when_missing(monkeypatch, tmp_path):
 def test_resolve_repo_rejects_invalid_string(tmp_path):
     with pytest.raises(ValueError, match="existing directory or a Git URL"):
         git_utils.resolve_repo("not-a-repo", tmp_path)
+
+
+def test_format_agent_branch_sanitizes_names():
+    assert git_utils.format_agent_branch("Sliding Window!") == "agent/sliding-window"
+    assert git_utils.format_agent_branch("  ") == "agent/approach"
+
+
+def test_build_pr_body_includes_results():
+    plan = Plan(
+        resolved_task="Add rate limiting to app.py",
+        interface_contract="class RateLimiter:\n    ...",
+        tests=[],
+        metrics=["correctness_score"],
+        weights={"correctness": 100.0},
+        eval_script="# eval",
+    )
+
+    iteration = Iteration(
+        attempt=1,
+        tests_passed=5,
+        tests_failed=0,
+    )
+
+    result = AgentResult(
+        approach="Sliding window",
+        success=True,
+        iterations=[iteration],
+        decision_trail=[],
+        metrics={"correctness_score": 1.0},
+        final_code="print('hi')",
+        work_dir="/tmp/agent/sliding-window",
+        branch_name="agent/sliding-window",
+    )
+
+    tournament = TournamentResult(results=[result], plan=plan)
+
+    body = git_utils.build_pr_body(tournament)
+    assert "Sliding window" in body
+    assert "agent/sliding-window" in body
+
 

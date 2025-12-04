@@ -120,6 +120,7 @@ class AgentResult:
     metrics: dict[str, Any]
     final_code: str
     work_dir: str
+    branch_name: str | None = None
     score: float = 0.0
     error: str | None = None
 

@@ -11,9 +11,9 @@ from typing import Callable, Any
 from anthropic import Anthropic
 
 from agentfleet.models import AgentResult, Decision, Iteration, Plan
+from agentfleet.git_utils import format_agent_branch
 from agentfleet.prompts import (
     format_agent_prompt,
-    format_fix_prompt,
     format_decision_extraction_prompt,
 )
 
@@ -47,9 +47,10 @@ async def run_agent_loop(
         AgentResult with success status, iterations, decisions, metrics
     """
     # Setup
+    branch_name: str | None = None
     if source_repo:
         # Create git worktree (will create work_dir)
-        _copy_source_repo(source_repo, work_dir, approach)
+        branch_name = _copy_source_repo(source_repo, work_dir, approach)
     else:
         # No source repo, just create work directory
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -119,6 +120,7 @@ async def run_agent_loop(
                 metrics={},
                 final_code=current_code,
                 work_dir=str(work_dir),
+                branch_name=branch_name,
                 error=f"Code generation failed: {e}",
             )
 
@@ -146,6 +148,7 @@ async def run_agent_loop(
                 metrics=eval_result["metrics"],
                 final_code=current_code,
                 work_dir=str(work_dir),
+                branch_name=branch_name,
             )
 
         # Prepare for next iteration
@@ -161,6 +164,7 @@ async def run_agent_loop(
         metrics=iterations[-1].error_messages if iterations else {},
         final_code=current_code,
         work_dir=str(work_dir),
+        branch_name=branch_name,
         error=f"Max iterations ({max_iterations}) reached without passing all tests",
     )
 
@@ -352,7 +356,7 @@ Please analyze these failures and fix the issues in your solution.
 """
 
 
-def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> None:
+def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> str:
     """Create a git worktree for the agent to work in.
 
     Args:
@@ -377,7 +381,7 @@ def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> None:
     if worktree_path.exists():
         shutil.rmtree(worktree_path, ignore_errors=True)
 
-    branch_name = f"agent/{approach.lower().replace(' ', '-')}"
+    branch_name = format_agent_branch(approach)
 
     def _run_git(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
         try:
@@ -411,3 +415,5 @@ def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> None:
         else:
             detail = e.stderr.strip() if e.stderr else None
             raise ValueError(_format_error(detail)) from e
+
+    return branch_name
