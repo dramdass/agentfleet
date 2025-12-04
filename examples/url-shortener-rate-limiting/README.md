@@ -44,7 +44,14 @@ export ANTHROPIC_API_KEY=your_key_here
 agentfleet \
   "Add rate limiting to app.py: 10 req/min on /shorten, 100 req/min on redirects, per-user. Use the {approach} approach." \
   "Token bucket" "Sliding window" "Fixed window" \
-  --repo flask-url-shortener \
+  --repo "$(pwd)/flask-url-shortener" \
+  --work-dir ./work
+
+# Or run directly from GitHub without cloning first
+agentfleet \
+  "Add rate limiting to app.py..." \
+  "Token bucket" "Sliding window" "Fixed window" \
+  --repo https://github.com/dramdass/flask-url-shortener.git \
   --work-dir ./work
 ```
 
@@ -53,14 +60,19 @@ The `--repo` flag points AgentFleet to the flask-url-shortener git repository. E
 - `agent/sliding-window`
 - `agent/fixed-window`
 
-After the tournament, you can inspect each agent's implementation:
+After the tournament, inspect each agent's implementation inside the target repo (or inside `--work-dir/repos/...` if you used a GitHub URL):
 ```bash
 cd flask-url-shortener
-git worktree list          # See all worktrees
-git diff agent/sliding-window agent/token-bucket  # Compare approaches
+git worktree list                    # View the agent worktrees and paths
+git branch -a | grep agent/          # List agent branches
+git checkout agent/sliding-window    # Inspect a specific approach
+pytest                               # Run your own test suite
+git diff agent/sliding-window main   # Compare against main
+git checkout main
+git merge agent/sliding-window       # Merge the winning branch
 ```
 
-The worktrees remain after the tournament so you can review, test, or merge the winning approach.
+When you provide a GitHub URL, AgentFleet clones it once into `--work-dir/repos/github.com-<org>-<repo>` and reuses that checkout. Worktrees remain after the tournament so you can review, test, or merge the winning approach at your own pace.
 
 ### What Happens
 

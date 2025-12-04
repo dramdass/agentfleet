@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -363,48 +364,50 @@ def _copy_source_repo(source_repo: Path, work_dir: Path, approach: str) -> None:
         FileNotFoundError: If source_repo doesn't exist
         ValueError: If source_repo is not a git repository
     """
-    if not source_repo.exists():
-        raise FileNotFoundError(f"Source repository not found: {source_repo}")
+    repo_path = source_repo.expanduser().resolve()
+    if not repo_path.exists():
+        raise FileNotFoundError(f"Source repository not found: {repo_path}")
 
-    # Verify it's a git repository
-    git_dir = source_repo / ".git"
+    git_dir = repo_path / ".git"
     if not git_dir.exists():
-        raise ValueError(f"Source repository is not a git repository: {source_repo}")
+        raise ValueError(f"Source repository is not a git repository: {repo_path}")
 
-    # Create sanitized branch name from approach
+    worktree_path = work_dir.expanduser().resolve()
+    worktree_path.parent.mkdir(parents=True, exist_ok=True)
+    if worktree_path.exists():
+        shutil.rmtree(worktree_path, ignore_errors=True)
+
     branch_name = f"agent/{approach.lower().replace(' ', '-')}"
 
-    # Create worktree with new branch
-    try:
-        result = subprocess.run(
-            ["git", "worktree", "add", "-b", branch_name, str(work_dir)],
-            cwd=source_repo,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        # If branch already exists, try to remove it first and retry
-        if "already exists" in e.stderr:
-            # Remove existing branch
-            subprocess.run(
-                ["git", "branch", "-D", branch_name],
-                cwd=source_repo,
-                capture_output=True,
-            )
-            # Remove existing worktree if any
-            subprocess.run(
-                ["git", "worktree", "remove", str(work_dir), "--force"],
-                cwd=source_repo,
-                capture_output=True,
-            )
-            # Retry
-            subprocess.run(
-                ["git", "worktree", "add", "-b", branch_name, str(work_dir)],
-                cwd=source_repo,
+    def _run_git(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                cmd,
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
-                check=True,
+                check=check,
             )
+        except FileNotFoundError:
+            raise ValueError("git executable not found. Cannot manage worktrees.") from None
+
+    def _format_error(extra: str | None = None) -> str:
+        base = f"Failed to create git worktree '{branch_name}' in {repo_path}"
+        return f"{base}: {extra}" if extra else base
+
+    try:
+        _run_git(["git", "worktree", "add", "-b", branch_name, str(worktree_path)])
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").lower()
+        if "already exists" in stderr or "worktree add" in stderr:
+            _run_git(["git", "branch", "-D", branch_name], check=False)
+            _run_git(["git", "worktree", "remove", str(worktree_path), "--force"], check=False)
+            shutil.rmtree(worktree_path, ignore_errors=True)
+            try:
+                _run_git(["git", "worktree", "add", "-b", branch_name, str(worktree_path)])
+            except subprocess.CalledProcessError as retry_error:
+                detail = retry_error.stderr.strip() if retry_error.stderr else None
+                raise ValueError(_format_error(detail)) from retry_error
         else:
-            raise ValueError(f"Failed to create git worktree: {e.stderr}") from e
+            detail = e.stderr.strip() if e.stderr else None
+            raise ValueError(_format_error(detail)) from e

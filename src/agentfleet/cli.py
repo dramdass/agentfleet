@@ -7,6 +7,7 @@ from pathlib import Path
 
 from agentfleet.planner import generate_plan
 from agentfleet.tournament import run_tournament
+from agentfleet.git_utils import resolve_repo
 from agentfleet.display import (
     print_plan,
     print_results,
@@ -98,8 +99,9 @@ Examples:
 
     parser.add_argument(
         "--repo",
-        type=Path,
-        help="Path to git repository to modify (agents create worktrees with branches like agent/token-bucket)",
+        type=str,
+        required=True,
+        help="Absolute path or GitHub URL for the target repository (agents create worktrees with branches like agent/token-bucket)",
     )
 
     return parser.parse_args()
@@ -126,6 +128,17 @@ async def main_async() -> int:
     console.print("\n[bold cyan]AgentFleet Tournament System[/bold cyan]\n")
     console.print(f"Task: [bold]{args.task}[/bold]")
     console.print(f"Approaches: {', '.join(args.approaches)}\n")
+
+    repo_arg = args.repo.strip()
+    if not repo_arg:
+        print_error("--repo must be a non-empty absolute path or GitHub URL")
+        return 1
+
+    try:
+        repo_path = resolve_repo(repo_arg, args.work_dir)
+    except ValueError as exc:
+        print_error(str(exc))
+        return 1
 
     try:
         # Phase 1: Generate evaluation plan
@@ -156,7 +169,7 @@ async def main_async() -> int:
                 max_iterations=args.max_iter,
                 mode=mode,
                 work_base_dir=args.work_dir,
-                source_repo=args.repo,
+                source_repo=repo_path,
             )
             progress.stop()
 

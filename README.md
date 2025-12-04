@@ -12,11 +12,15 @@ AgentFleet runs multiple AI agents simultaneously, each implementing a different
 # Install
 pip install -e .
 
-# Run tournament (standalone implementation)
-agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" "Fixed window"
+# Run tournament against a local repo (required)
+agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" "Fixed window" \
+  --repo /Users/you/path/to/repo
 
-# Run on existing codebase (agents create git worktrees with separate branches)
-agentfleet "Add rate limiting to app.py" "Token bucket" "Sliding window" --repo path/to/git-repo
+# Run directly from GitHub (AgentFleet clones into ./work/repos/<slug>)
+agentfleet "Add rate limiting" "Token bucket" "Sliding window" \
+  --repo https://github.com/dramdass/flask-url-shortener.git
+
+> `--repo` is required and must be either an absolute local path or a full GitHub URL.
 
 # Interactive mode (pause at decisions)
 agentfleet "Implement a rate limiter" "Token bucket" "Sliding window" --interactive
@@ -47,7 +51,7 @@ Converged in 2 iterations. Simplest at 42 lines with perfect correctness.
 
 ## Git Worktrees
 
-When using `--repo`, AgentFleet creates git worktrees for each agent instead of copying files. Each agent works in an isolated branch:
+AgentFleet always targets a git repository. If you pass an absolute filesystem path we use it directly; if you pass a GitHub URL we clone it into `--work-dir/repos/<repo-slug>` and reuse that checkout on future runs. Every agent operates in its own worktree/branch:
 
 ```bash
 # After tournament
@@ -59,11 +63,15 @@ git checkout agent/token-bucket      # Inspect an approach
 git merge agent/sliding-window       # Merge the winner
 ```
 
-Worktrees persist after the tournament, allowing you to:
-- Review each implementation independently
-- Compare approaches using git diff
-- Test different implementations
-- Merge the winning approach into your main branch
+Typical review flow after a tournament:
+- `cd /path/to/your/repo` (or the clone under `--work-dir/repos/...`)
+- `git worktree list` to see all agent worktrees and check their filesystem locations
+- `git branch -a | grep agent/` to see all agent branches
+- `git checkout agent/sliding-window && pytest` to inspect and test an approach
+- `git diff agent/sliding-window main` to review changes
+- `git checkout main && git merge agent/sliding-window` to merge the winner
+
+Worktrees persist after the tournament so you can diff, test, and merge whenever you're ready. Delete them with `git worktree remove <path>` once you're done.
 
 ## Architecture
 

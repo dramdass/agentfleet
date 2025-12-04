@@ -42,9 +42,19 @@ async def run_tournament(
     if len(approaches) < 2:
         raise ValueError("Tournament requires at least 2 approaches")
 
+    if source_repo is None:
+        raise ValueError("A git repository is required. Provide --repo with a valid path or URL.")
+
+    source_repo = source_repo.expanduser().resolve()
+    if not source_repo.exists():
+        raise ValueError(f"Source repository not found: {source_repo}")
+
     # Setup work directories
     if work_base_dir is None:
         work_base_dir = Path.cwd() / "work"
+
+    work_base_dir = work_base_dir.expanduser().resolve()
+    work_base_dir.mkdir(parents=True, exist_ok=True)
 
     work_dirs = [work_base_dir / approach.replace(" ", "_") for approach in approaches]
 
@@ -195,6 +205,7 @@ async def run_tournament_with_live_updates(
     max_iterations: int = 10,
     mode: str = "speculative",
     display_callback: Callable[[list[AgentResult]], None] | None = None,
+    source_repo: Path | None = None,
 ) -> TournamentResult:
     """Run tournament with live progress updates.
 
@@ -208,13 +219,21 @@ async def run_tournament_with_live_updates(
         max_iterations: Max iterations per agent
         mode: "speculative" or "interactive"
         display_callback: Callback for displaying progress
+        source_repo: Absolute path to the validated git repository
 
     Returns:
         TournamentResult with rankings
     """
     # Start tournament
     tournament_task = asyncio.create_task(
-        run_tournament(task, approaches, plan, max_iterations, mode)
+        run_tournament(
+            task=task,
+            approaches=approaches,
+            plan=plan,
+            max_iterations=max_iterations,
+            mode=mode,
+            source_repo=source_repo,
+        )
     )
 
     # Poll for updates while tournament runs
